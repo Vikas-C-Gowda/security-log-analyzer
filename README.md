@@ -36,6 +36,12 @@ security-log-analyzer/
 ├── reports/
 │   ├── security_report.txt
 │   └── security_report.html
+│
+├── images/
+│   ├── terminal-output-1.png
+│   ├── terminal-output-2.png
+│   ├── html-dashboard-overview.png
+│   └── html-dashboard-details.png
 ```
 
 ---
