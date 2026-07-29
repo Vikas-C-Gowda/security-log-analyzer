@@ -5,7 +5,6 @@ from datetime import datetime
 
 DEFAULT_LOG_FILE = "sample_logs/access.log"
 
-
 def read_log_file(file_path):
     try:
         with open(file_path, "r") as file:
