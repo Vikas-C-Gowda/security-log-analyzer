@@ -1,6 +1,7 @@
 import re
 from collections import Counter
 import sys
+from datetime import datetime
 
 DEFAULT_LOG_FILE = "sample_logs/access.log"
 
@@ -191,6 +192,332 @@ def generate_text_report(parsed_logs):
 
     print(f"\nText report generated: {report_path}")
 
+def generate_html_report(parsed_logs):
+    total_requests = len(parsed_logs)
+
+    ip_counter = Counter(log["ip"] for log in parsed_logs)
+    top_ips = ip_counter.most_common(5)
+
+    method_counter = Counter(log["method"] for log in parsed_logs)
+
+    failed_logins = sum(
+        1 for log in parsed_logs
+        if log["method"] == "POST"
+        and log["path"] == "/login"
+        and log["status"] == 401
+    )
+
+    suspicious_events = sum(
+        1 for log in parsed_logs
+        if log["status"] in [403, 404, 500]
+    )
+
+    report_time = datetime.now().strftime("%d %b %Y | %I:%M:%S %p")
+
+    if suspicious_events >= 3:
+        overall_risk = "HIGH"
+        risk_color = "#dc3545"
+        risk_message = "Multiple suspicious events detected. Immediate investigation is recommended."
+    elif suspicious_events >= 1:
+        overall_risk = "MEDIUM"
+        risk_color = "#fd7e14"
+        risk_message = "Some suspicious activities were detected. Review the affected requests."
+    else:
+        overall_risk = "LOW"
+        risk_color = "#28a745"
+        risk_message = "No suspicious security events detected."
+
+    html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+<title>Security Log Report</title>
+
+<style>
+body {{
+    font-family: Arial;
+    background:#f4f4f4;
+    margin:40px;
+}}
+
+.container {{
+    background:white;
+    padding:30px;
+    border-radius:10px;
+}}
+
+table {{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:20px;
+}}
+
+th,td {{
+    border:1px solid #ccc;
+    padding:10px;
+}}
+
+th {{
+    background:#333;
+    color:white;
+}}
+
+h1 {{
+    color:#1f4e79;
+}}
+
+.cards{{
+    display:flex;
+    gap:20px;
+    margin:25px 0;
+}}
+
+.card{{
+    flex:1;
+    background:#eef6ff;
+    padding:15px;
+    border-radius:10px;
+    text-align:center;
+    box-shadow:0 2px 6px rgba(0,0,0,0.1);
+}}
+
+.card h3{{
+    margin:0;
+    color:#1f4e79;
+}}
+
+.card p{{
+    font-size:24px;
+    font-weight:bold;
+    margin-top:12px;
+}}
+
+.success{{
+    background:#28a745;
+    color:white;
+    padding:5px 10px;
+    border-radius:20px;
+    font-weight:bold;
+}}
+
+.warning{{
+    background:#ffc107;
+    color:black;
+    padding:5px 10px;
+    border-radius:20px;
+    font-weight:bold;
+}}
+
+.danger{{
+    background:#dc3545;
+    color:white;
+    padding:5px 10px;
+    border-radius:20px;
+    font-weight:bold;
+}}
+
+.info{{
+    background:#17a2b8;
+    color:white;
+    padding:5px 10px;
+    border-radius:20px;
+    font-weight:bold;
+}}
+
+.high-risk{{
+    color:#dc3545;
+    font-weight:bold;
+}}
+
+.medium-risk{{
+    color:#fd7e14;
+    font-weight:bold;
+}}
+
+.low-risk{{
+    color:#17a2b8;
+    font-weight:bold;
+}}
+
+.safe{{
+    color:#28a745;
+    font-weight:bold;
+}}
+
+.summary-box{{
+    margin:25px 0;
+    padding:18px;
+    border-left:6px solid;
+    background:#f8f9fa;
+    border-radius:8px;
+}}
+
+.rank{{
+    text-align:center;
+    font-weight:bold;
+}}
+
+.requests{{
+    text-align:center;
+}}
+
+.ip-column{{
+    text-align:center;
+}}
+
+.method{{
+    text-align:center;
+}}
+
+.count{{
+    text-align:center;
+}}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Security Log Analysis Report</h1>
+
+<p style="color:gray; margin-top:-10px;">
+Generated: {report_time}
+</p>
+
+<div class="summary-box" style="border-color:{risk_color};">
+<h3>Overall Security Risk: <span style="color:{risk_color};">{overall_risk}</span></h3>
+<p>{risk_message}</p>
+</div>
+
+<div class="cards">
+
+<div class="card">
+<h3>Total Requests</h3>
+<p>{total_requests}</p>
+</div>
+
+<div class="card">
+<h3>Failed Logins</h3>
+<p>{failed_logins}</p>
+</div>
+
+<div class="card">
+<h3>Suspicious Events</h3>
+<p>{suspicious_events}</p>
+</div>
+
+</div>
+"""
+    
+    html += """
+<h2>Top Active IPs</h2>
+
+<table>
+<tr>
+<th>Rank</th>
+<th>IP Address</th>
+<th>Requests</th>
+</tr>
+"""
+
+    rank = 1
+
+    for ip, count in top_ips:
+        html += f"""
+<tr>
+<td class="rank">{rank}</td>
+<td class="ip-column">{ip}</td>
+<td class="requests">{count}</td>
+</tr>
+"""
+        rank += 1
+
+    html += """
+    </table>
+"""
+    html += """
+<h2>Request Method Summary</h2>
+
+<table>
+<tr>
+<th>Method</th>
+<th>Count</th>
+</tr>
+"""
+
+    for method, count in method_counter.items():
+        html += f"""
+<tr>
+<td class="method">{method}</td>
+<td class="count">{count}</td>
+</tr>
+"""
+    html += """
+</table>
+"""
+
+    html += """
+<table>
+
+<tr>
+<th>IP Address</th>
+<th>Method</th>
+<th>Path</th>
+<th>Status</th>
+<th>Risk</th>
+</tr>
+    """
+    for log in parsed_logs:
+
+        status = log["status"]
+
+        if status == 200:
+            badge = '<span class="success">200</span>'
+        elif status in [401, 403]:
+            badge = f'<span class="warning">{status}</span>'
+        elif status >= 500:
+            badge = f'<span class="danger">{status}</span>'
+        else:
+            badge = f'<span class="info">{status}</span>'
+
+        if status >= 500:
+            risk = '<span class="high-risk">HIGH</span>'
+        elif status in [401, 403]:
+            risk = '<span class="medium-risk">MEDIUM</span>'
+        elif status == 404:
+            risk = '<span class="low-risk">LOW</span>'
+        else:
+            risk = '<span class="safe">SAFE</span>'
+
+        html += f"""
+<tr>
+<td>{log['ip']}</td>
+<td>{log['method']}</td>
+<td>{log['path']}</td>
+<td>{badge}</td>
+<td>{risk}</td>
+</tr>
+    """
+
+    html += """
+</table>
+
+</div>
+
+</body>
+</html>
+    """
+
+    report_path = "reports/security_report.html"
+
+    with open(report_path, "w", encoding="utf-8") as file:
+        file.write(html)
+
+    print(f"\nHTML report generated: {report_path}")
+
 def assess_ip_risk(parsed_logs):
     print("\n===== IP Risk Assessment =====")
 
@@ -347,6 +674,7 @@ def main():
     generate_security_summary(parsed_logs)
     show_top_active_ips(parsed_logs)
     generate_text_report(parsed_logs)
+    generate_html_report(parsed_logs)
     assess_ip_risk(parsed_logs)
     detect_directory_scanning(parsed_logs)
     generate_security_findings(parsed_logs)
