@@ -1,0 +1,13 @@
+===== Security Log Analysis Report =====
+
+Total Requests: 10
+Failed Login Attempts: 3
+Brute Force IPs: 1
+Suspicious Status Events: 3
+
+Top Active IPs:
+ - 192.168.1.11: 3 requests
+ - 192.168.1.10: 1 requests
+ - 192.168.1.12: 1 requests
+ - 192.168.1.15: 1 requests
+ - 192.168.1.16: 1 requests
