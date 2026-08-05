@@ -3,6 +3,14 @@ from collections import Counter
 import sys
 from datetime import datetime
 
+class Colors:
+    RED = "\033[91m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    BLUE = "\033[94m"
+    CYAN = "\033[96m"
+    RESET = "\033[0m"
+
 DEFAULT_LOG_FILE = "sample_logs/access.log"
 
 def read_log_file(file_path):
@@ -143,11 +151,11 @@ def generate_security_summary(parsed_logs):
         if log["status"] in [403, 404, 500]
     )
 
-    print("\n========== Security Summary ==========")
-    print(f"Total Requests            : {total_requests}")
-    print(f"Failed Login Attempts     : {failed_logins}")
-    print(f"Brute Force IPs Detected  : {len(brute_force_ips)}")
-    print(f"Suspicious Status Events  : {suspicious_statuses}")
+    print(f"\n{Colors.CYAN}========== Security Summary =========={Colors.RESET}")
+    print(f"{Colors.BLUE}Total Requests           : {Colors.RESET}{total_requests}")
+    print(f"{Colors.YELLOW}Failed Login Attempts    : {Colors.RESET}{failed_logins}")
+    print(f"{Colors.RED}Brute Force IPs Detected : {Colors.RESET}{len(brute_force_ips)}")
+    print(f"{Colors.RED}Suspicious Status Events : {Colors.RESET}{suspicious_statuses}")
 
 def show_top_active_ips(parsed_logs):
     ip_counter = Counter(log["ip"] for log in parsed_logs)
@@ -597,6 +605,7 @@ def generate_security_findings(parsed_logs):
     findings = []
 
     ip_failures = Counter()
+    directory_scan = Counter()
 
     for log in parsed_logs:
         if (
@@ -611,6 +620,8 @@ def generate_security_findings(parsed_logs):
             )
 
         if log["path"] in ["/admin", "/phpmyadmin", "/.git", "/.env"]:
+            directory_scan[log["ip"]] += 1
+
             findings.append(
                 ("MEDIUM", f"Sensitive path accessed: {log['path']} from {log['ip']}")
             )
@@ -626,6 +637,12 @@ def generate_security_findings(parsed_logs):
                 ("HIGH", f"Possible brute-force attack from {ip} ({count} failed logins)")
             )
 
+    for ip, count in directory_scan.items():
+        if count >= 3:
+            findings.append(
+                ("HIGH", f"Possible directory scanning from {ip} ({count} sensitive paths accessed)")
+            )
+
     if not findings:
         print("No security findings.")
         return
@@ -639,7 +656,14 @@ def generate_security_findings(parsed_logs):
     findings.sort(key=lambda x: severity_order[x[0]], reverse=True)
 
     for severity, message in findings:
-        print(f"[{severity}] {message}")
+        if severity == "HIGH":
+            color = Colors.RED
+        elif severity == "MEDIUM":
+            color = Colors.YELLOW
+        else:
+            color = Colors.GREEN
+
+        print(f"{color}[{severity}]{Colors.RESET} {message}")
 
 def main():
     if len(sys.argv) > 1:
