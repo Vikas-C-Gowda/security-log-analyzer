@@ -2,6 +2,7 @@ import re
 from collections import Counter
 import sys
 from datetime import datetime
+import csv
 
 class Colors:
     RED = "\033[91m"
@@ -525,6 +526,70 @@ Generated: {report_time}
 
     print(f"\nHTML report generated: {report_path}")
 
+def generate_csv_report(parsed_logs, output_file="reports/security_report.csv"):
+    with open(output_file, "w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.writer(csvfile)
+
+        writer.writerow(["Security Log Analysis Report"])
+        writer.writerow([])
+
+        writer.writerow(["Total Requests", len(parsed_logs)])
+
+        failed_logins = sum(
+            1 for log in parsed_logs
+            if log["method"] == "POST"
+            and log["path"] == "/login"
+            and log["status"] == 401
+        )
+
+        writer.writerow(["Failed Login Attempts", failed_logins])
+
+        writer.writerow([])
+
+        method_counter = Counter(log["method"] for log in parsed_logs)
+
+        writer.writerow(["Request Method Summary"])
+        writer.writerow(["Method", "Count"])
+
+        for method, count in method_counter.items():
+            writer.writerow([method, count])
+
+        writer.writerow([])
+
+        writer.writerow(["Detailed Log Entries"])
+
+        writer.writerow([
+            "IP Address",
+            "Method",
+            "Path",
+            "Status",
+            "Risk",
+            "Timestamp"
+        ])
+
+        for log in parsed_logs:
+            status = log["status"]
+
+            if status >= 500:
+                risk = "HIGH"
+            elif status in [401, 403]:
+                risk = "MEDIUM"
+            elif status == 404:
+                risk = "LOW"
+            else:
+                risk = "SAFE"
+
+            writer.writerow([
+                log["ip"],
+                log["method"],
+                log["path"],
+                log["status"],
+                risk,
+                log["timestamp"]
+            ])
+
+    print(f"{Colors.GREEN}[SUCCESS]{Colors.RESET} CSV report saved as {output_file}")
+
 def assess_ip_risk(parsed_logs):
     print("\n===== IP Risk Assessment =====")
 
@@ -599,6 +664,28 @@ def detect_directory_scanning(parsed_logs):
     if not found:
         print("No directory scanning detected.")
 
+def detect_404_scanning(parsed_logs):
+    print(f"\n{Colors.CYAN}===== 404 Scanning Detection ====={Colors.RESET}")
+
+    scan_counter = Counter()
+
+    for log in parsed_logs:
+        if log["status"] == 404:
+            scan_counter[log["ip"]] += 1
+
+    found = False
+
+    for ip, count in scan_counter.items():
+        if count >= 3:
+            found = True
+            print(
+                f"{Colors.RED}[HIGH]{Colors.RESET} "
+                f"{ip} generated {count} HTTP 404 responses."
+            )
+
+    if not found:
+        print(f"{Colors.GREEN}No 404 scanning detected.{Colors.RESET}")
+
 def generate_security_findings(parsed_logs):
     print("\n========== Security Findings ==========")
 
@@ -606,6 +693,7 @@ def generate_security_findings(parsed_logs):
 
     ip_failures = Counter()
     directory_scan = Counter()
+    scan_404 = Counter()
 
     for log in parsed_logs:
         if (
@@ -631,10 +719,19 @@ def generate_security_findings(parsed_logs):
                 ("LOW", f"HTTP {log['status']} on {log['path']} from {log['ip']}")
             )
 
+        if log["status"] == 404:
+            scan_404[log["ip"]] += 1
+
     for ip, count in ip_failures.items():
         if count >= 3:
             findings.append(
                 ("HIGH", f"Possible brute-force attack from {ip} ({count} failed logins)")
+            )
+
+    for ip, count in scan_404.items():
+        if count >= 3:
+            findings.append(
+                ("HIGH", f"Possible 404 scanning detected from {ip} ({count} HTTP 404 responses)")
             )
 
     for ip, count in directory_scan.items():
@@ -698,8 +795,10 @@ def main():
     show_top_active_ips(parsed_logs)
     generate_text_report(parsed_logs)
     generate_html_report(parsed_logs)
+    generate_csv_report(parsed_logs)
     assess_ip_risk(parsed_logs)
     detect_directory_scanning(parsed_logs)
+    detect_404_scanning(parsed_logs)
     generate_security_findings(parsed_logs)
 
 if __name__ == "__main__":
